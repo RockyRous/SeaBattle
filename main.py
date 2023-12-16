@@ -1,5 +1,10 @@
+from Game import *
+
+# Создаем обьект класса игра
+game = Game()
+
+
 def main():
-    pass
 
 
 if __name__ == '__main__':

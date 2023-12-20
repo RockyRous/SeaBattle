@@ -4,36 +4,31 @@ from Game import *
 game = Game()
 game.debug = True
 
-# используем при отладке @game.clear_screen
 
 welcome_message()
 
 if __name__ == '__main__':
     game.start()  # Выводим приветствие игры и производим настройку
+    # Определяем какие найстройки мне нужны
     # Настраиваем противника (возможно настраиваем поле, корабли и др параметры)
 
-    # Начинаем игровой цикл
-    while True:
-        game.print_ui()  # ввыводим весь интерфейс
 
-        game.setup_ship()  # Раставляем своё поле с кораблями
-        game.setup_ship(ai, auto)  # Раставляем поле противника
+    # Начинаем цикл растановки поля кораблями
+    game.setup_ship()
 
-        game.print_ui()  # Обновляем юи
+    game.print_ui()  # ввыводим весь интерфейс
 
-        player_step = True
-        while player_step:
-            player_step = game.step_player()  # Делаем выстрел на поле противника
-            # Если попали - ходим еще, если ошибка - ходим еще.
-            # Ход закончен = выходим из цикла
-
-        game.is_win()  # Проверяем факт победы
-        game.print_ui()  # Обновляем юи
-
-        game.step_ai()  # Ход аи
-
-        game.is_win()  # Проверяем факт победы
-        game.print_ui()  # Обновляем юи
+    # # Имеем настроеную игру и раставленные доски для игры. т.е. полная подготовка завершена.
+    # # Начинаем игровой цикл
+    # while True:
+    #
+    #     game.step_player()  # Игрок делает ход
+    #     game.print_ui()
+    #     game.is_win()  # Проверяем факт победы
+    #
+    #     game.step_ai()  # Ход ИИ
+    #     game.print_ui()
+    #     game.is_win()
 
 
 

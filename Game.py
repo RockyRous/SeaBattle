@@ -2,34 +2,19 @@
 В данном файле описана основная логика игры
 """
 import random
-import game_errors
+from game_errors import *
 
 
 def welcome_message():
     """ Print welcome message at startup """
-    print('Hello in SeaBattle')
-
-
-# def step(fn, game):
-#     """
-#     Decorator
-#     print ui
-#     func
-#     is win?
-#     """
-#     def wrapper(*args, **kwargs):
-#         result = fn(*args, **kwargs)
-#         game.print_ui()  # ввыводим интерфейс
-#         game.is_win()  # Проверяем факт победы
-#         return result
-#     return wrapper
+    print('How to play Sea Battle... (soon)')
 
 
 class Dot:
     def __init__(self, x: int, y: int, value='0'):
         self.x, self.y = x, y
         self.value = value
-        self.free = True
+        self.free = True  # Used to install ships
     # Имеет одно из значений (Пусто\мимо\попал\корабль)
 
     # Использует маг методы сравнения
@@ -40,7 +25,6 @@ class Dot:
 
 class Ship:
     """ Ship data """
-
     def __init__(self, size: int, pivot_dot: Dot, rotate: int = 0):
         self.size = size
         self.pivot_dot = pivot_dot
@@ -48,36 +32,35 @@ class Ship:
         self.rotate = rotate
         self.hp = size
 
-        # Имя корабля?
-        # Можно сделать генератор дающий имя и поставить его в стандарт переменной
-
 
 class Field:
-    def __init__(self, hide: bool):
+    def __init__(self, hide: bool, name: str) -> None:
         # Размер игрового поля
-        x = y = 6
+        self.x = self.y = 6
         # Его инициализация
-        self.board = [[Dot(i, j) for i in range(x)] for j in range(y)]
+        self.board = [[Dot(i, j) for i in range(self.x)] for j in range(self.y)]
         # board[y][x]!!!!
 
-        self.hide = hide  # Отображение поля
+        self.name = name  # Кому принадлежит поле
+        self.hide = hide  # Отображение поля (не используется :С )
         self.active_ships = 0  # Кол-во активных кораблей
         self.ships = []  # Обьекты принадлежащих кораблей
 
-        # list:[list[name: str, size: int], list[name: str, size: int]...] Надо сделать отдельно от класса
-        self.ship_list = [['3', 3], ['2', 2], ['2', 2], ['1', 1], ['1', 1], ['1', 1], ['1', 1]]
+        # Плохое место хранения, но удобнее пока нет
+        # list:[list[name: str, size: int]]
+        self.ship_list = [['Фрегат (3)', 3], ['Корвет (2)', 2], ['Корвет (2)', 2], ['Лодка (1)', 1],
+                          ['Лодка (1)', 1], ['Лодка (1)', 1], ['Лодка (1)', 1]]
 
-    @staticmethod
-    def out(x, y) -> bool:
+    def out(self, x: int, y: int) -> bool:
         """
         Проверяет, выходит ли точка за пределы поля
         """
-        if x in range(0, 6) and y in range(0, 6):
+        if x in range(0, self.x) and y in range(0, self.y):
             return True
         return False
 
     def get_ship_dots(self, ship: Ship) -> list[Dot] or bool:
-        """ return all dots in ship """
+        """ return all dots in ship or False! """
         dots_list = []
         x = ship.pivot_dot.x
         y = ship.pivot_dot.y
@@ -89,8 +72,8 @@ class Field:
         elif ship.rotate == 1:  # Слева - направо
             for i in range(ship.size - 1):
                 x += 1
-                if x > 5:
-                    game_errors.er02()
+                if x > 5:  # Можно было сделать через self.out, но выходит больше действий
+                    er02()
                     return False
                 dots_list.append(self.board[y][x])
 
@@ -98,7 +81,7 @@ class Field:
             for i in range(ship.size - 1):
                 y += 1
                 if y > 5:
-                    game_errors.er02()
+                    er02()
                     return False
                 dots_list.append(self.board[y][x])
 
@@ -106,7 +89,7 @@ class Field:
             for i in range(ship.size - 1):
                 x -= 1
                 if x < 0:
-                    game_errors.er02()
+                    er02()
                     return False
                 dots_list.append(self.board[y][x])
 
@@ -114,12 +97,11 @@ class Field:
             for i in range(ship.size - 1):
                 y -= 1
                 if y < 0:
-                    game_errors.er02()
+                    er02()
                     return False
                 dots_list.append(self.board[y][x])
         else:
-            print('Что-то пошло не так... get_ship_dots -> ship.rotate??')
-            print(ship.rotate)
+            raise GameError(f'Что-то пошло не так... get_ship_dots -> ship.rotate?? {ship.rotate} ')
         return dots_list
 
     def contour(self, dot: Dot) -> None:
@@ -152,18 +134,15 @@ class Field:
     def may_add_ship(self, ship: Ship) -> bool:
         """ Check free Dot for ship """
         if not ship.pivot_dot.free:  # Дот заблокирован
-            game_errors.er01(ship.pivot_dot)
+            er01(ship.pivot_dot)
             return False
         if ship.size > 1:  # Корабль занимает больше 1 дота
             dots_list = self.get_ship_dots(ship)  # Получаем список всех дотов корабля
             if dots_list == False:
                 return False
             for dot in dots_list:
-                # if not self.out(dot.x, dot.y):
-                #     game_errors.er02(dot)
-                #     return False
                 if not dot.free:
-                    game_errors.er03(dot)
+                    er03(dot)
                     return False
         return True
 
@@ -276,42 +255,63 @@ class Player:
 
     Имеет своё поле
     имеет доску противника
-    автодеплой кораблей
+
     ask - where to shoot (переопределяется в дочерках)
     move - стреляем и отрабатываем ошибки
+
+    функция рандомного выбора дота в который не стреляли
     """
 
 
 class User(Player):
     """
     переопределяем аск
-
+    Возможность выбора рандомного выстрела
     """
 
 
+class PlayerAI(Player):
+    """
+    Переопределяем аск
+    рандом по полю
 
+    Если попали и не убили -
+    """
 
 
 class Game:
     """
     Main game class.
-    Здесь высокоуровневая логика ссылающаяся на низкоуровневую (на другие классы)
+    Здесь высокоуровневая логика ссылающаяся на низкоуровневую (и интерфейс)
     """
 
-    def __init__(self, debug: bool = False):
+    def __init__(self, debug: bool = False) -> None:
         self.debug = debug  # При дебаге хочу выводить поле противника себе и мб еще что
         self.last_action = None  # Последнее событие для вывода в интерфейсе
-        self.player_field = Field(hide=True)
-        self.ai_field = Field(hide=True)
+        self.player_field = Field(hide=True, name='Player')  # Можно сделать ввод своего имени
+        self.ai_field = Field(hide=True, name='AI')
 
-    def start(self):
-        """ Welcome and settings """
+    def start(self) -> None:
+        """ Start the game. """
         a = f'Welcome to Sea Battle'
         print(a)
         # Определяем какие найстройки мне нужны
         # Напимер ии или что-то еще, пока просто привет
 
-    def setup_ship(self):
+        self.setup_ship()  # Расставляем корабли
+        self.print_ui()  # выводим весь интерфейс
+
+        # Начинаем игровой цикл
+        while True:
+            self.step_player()  # Игрок делает ход
+            self.print_ui()
+            self.is_win(self.ai_field)  # Проверяем факт победы
+
+            self.step_ai()  # Ход ИИ
+            self.print_ui()
+            self.is_win(self.player_field)
+
+    def setup_ship(self) -> None:
         """
         Вывод описания
         Вопрос автодеплоя
@@ -338,36 +338,50 @@ class Game:
                     self.player_field.auto_deploy_ships()
                     input_start = False
                 else:
-                    print('Ошибка 1/2 Введите только 1 или 2')
-            except:
-                print('Ошибка try Введите только 1 или 2 (возможно проблема глубже)')
+                    raise GameError('Ошибка 1/2 Введите только 1 или 2')
+            except GameError as ge:
+                print(ge)
 
         # Авторазмещение поля противника
         self.ai_field.auto_deploy_ships()
 
-    def step_player(self):
+    def step_player(self) -> None:
         """
+        Обращаемся к классу игрока
         1 - инпут хода игрока + описание что делать
         2 - валидация хода
         3 - выполнение хода (стрельба -> результат) (должен возвращаться бул + данные)
         4 - повтор в зависимости от результата
         """
 
-    def is_win(self):
+    @staticmethod  # Если не будем использовать стату
+    def is_win(field: Field) -> None:
         """ win or None """
+        # Получаем поле проигравшего
+        if field.active_ships == 0:
+            if field.name == 'AI':
+                print('Ура победа! Вы одолели эту консервную банку! Вы молодец!')
+            else:
+                print('О нет! Технологии вас одолели! :С')
         """
-        Производим проверку отсутствия живых кораблей у досок
-        Наверное передаем боард
+        Получаем боард, проверяем кол-во активных кораблей на доске
+        Если 0 - то обьявляем победу 
         
-        Если вин - то логика завершения игры
+        Отдельная тут логика - победа.
+        Пишем кто выйграл и предлагаем начать новую игру или закрыть игру.
         """
 
-    def step_ai(self):
+    def step_ai(self) -> None:
         """
+        Обращаемся к классу ИИ
         1 - Запуск рандома и его валидация
         2 - выполнение хода (должен возвращаться бул + данные)
         3 - при попадании отработка логики (продолжение хода)
         """
+
+    # ================================================
+    #                   Interface
+    # ================================================
 
     def print_message(self, last_action: str) -> None:
         """ print last message """
@@ -377,33 +391,30 @@ class Game:
                      f'****************************')
             print(query)
 
-    def print_fields(self, debug: bool, player_field: Field, ai_field: Field) -> None:
-        if debug:
-            for y in player_field.board:
+    def print_fields(self) -> None:
+        if self.debug:
+            for y in self.player_field.board:
                 print([f'x={dot.x}|y={dot.y}|value={dot.value}|free={dot.free}' for dot in y])
             print('')
-            for y in ai_field.board:
+            for y in self.ai_field.board:
                 print([f'x={dot.x}|y={dot.y}|value={dot.value}|free={dot.free}' for dot in y])
         else:
-            for y in player_field.board:
+            for y in self.player_field.board:
                 print([f'{dot.value}' for dot in y])
             print('')
-            for y in ai_field.board:
+            for y in self.ai_field.board:
                 print([f'{dot.value}' for dot in y])
         # выводим поле врага форматируя символы
 
-    def print_ui(self):
+    def print_ui(self) -> None:
         """
-        Используем местный класс интерфейс.
         Выводим клевый интерфейс:
-        описание последнего события (в идеале окно с логом но кто мы такие делать это в консоли)
-        своя доска и доска противника всё под форматированием
+        1. Производим очистку интерфейса (если без дебага)
+        2. Выводим ласт экшн
+        3. Выводим доски
         """
-        # При дебаге - выводим поле врага открытым
-        self.print_fields(True, self.player_field, self.ai_field)
+        #
+        self.print_fields()
 
 
-            # Функцию очистки кмд
 
-    #
-    # def clear_screen():  # будет декоратором

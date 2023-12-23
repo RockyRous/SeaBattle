@@ -16,3 +16,14 @@ def er03(dot):
 
 def er04():
     print('Er04: Ошибка Field.out')
+
+
+class GameError(Exception):
+    def __init__(self, text):
+        self.txt = text
+
+    # try:
+    #     raise GameError("You give negative!")
+
+    # except GameError as ge:
+    #     print(ge)

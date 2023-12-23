@@ -1,3 +1,6 @@
+from game_errors import GameError
+
+
 def gen_name():
     for i in range(100):
         yield i
@@ -17,3 +20,4 @@ print(Testing1.name)
 print(Testing2.name)
 print(Testing3.name)
 print(Testing4.name)
+

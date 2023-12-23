@@ -2,7 +2,7 @@
 В данном файле описана основная логика игры
 """
 import random
-from game_errors import *
+from game_errors import er01, er02, er03, er04
 
 
 def welcome_message():
@@ -10,12 +10,22 @@ def welcome_message():
     print('How to play Sea Battle... (soon)')
 
 
+class GameError(Exception):
+    """ Raised when an error occurs """
+    def __init__(self, text):
+        self.txt = text
+
+
 class Dot:
-    def __init__(self, x: int, y: int, value='0'):
+    def __init__(self, x: int, y: int, value='О'):
         self.x, self.y = x, y
         self.value = value
         self.free = True  # Used to install ships
-    # Имеет одно из значений (Пусто\мимо\попал\корабль)
+        self.ship = None
+
+    def set_ship(self, ship) -> None:
+        """ Set ship to dot """
+        self.ship = ship
 
     # Использует маг методы сравнения
     # __eq__() – для равенства ==
@@ -25,6 +35,7 @@ class Dot:
 
 class Ship:
     """ Ship data """
+
     def __init__(self, size: int, pivot_dot: Dot, rotate: int = 0):
         self.size = size
         self.pivot_dot = pivot_dot
@@ -44,7 +55,7 @@ class Field:
         self.name = name  # Кому принадлежит поле
         self.hide = hide  # Отображение поля (не используется :С )
         self.active_ships = 0  # Кол-во активных кораблей
-        self.ships = []  # Обьекты принадлежащих кораблей
+        self.ships = []  # Обьекты принадлежащих кораблей / Наполняется, но не используется
 
         # Плохое место хранения, но удобнее пока нет
         # list:[list[name: str, size: int]]
@@ -122,7 +133,8 @@ class Field:
         # Размещение
         dots_list = self.get_ship_dots(ship)
         for dot in dots_list:
-            dot.value = 'T'
+            dot.value = '■'
+            dot.set_ship(ship)
             self.contour(dot)
 
         # Добавление активного судна
@@ -196,7 +208,6 @@ class Field:
                     else:
                         game_errors.er04()
 
-
                 ship_pivot_dot = self.board[input_y][input_x]  # Вызываем Dot этих координат
 
                 # Обьявляем судно с полученными данными
@@ -244,9 +255,19 @@ class Field:
 
             self.add_ship(new_ship)
 
-    def shot(self, x: int, y: int) -> str:
-        return 'Выстрел произведен, вы попали'
-        # return 'Выстрел произведен, вы не попали'
+    def shot(self, ship: Ship) -> bool:
+        """
+        Отнимает жизь кораблю, если их теперь 0, то убирает его из списка и возвращает бул
+        """
+        if ship.hp == 1:
+            ship.hp = 0
+            # self.ship_list.remove(ship)  # Будет тут ошибка?
+            self.active_ships -= 1
+            kill = True
+        else:
+            ship.hp -= 1
+            kill = False
+        return kill
 
 
 class Player:
@@ -262,12 +283,88 @@ class Player:
     функция рандомного выбора дота в который не стреляли
     """
 
+    def __init__(self, name):
+        self.name = name
+        self.field = Field(hide=True, name=self.name)
+
+    @staticmethod
+    def ask(field: Field) -> tuple[int, int]:
+        pass
+
+    @staticmethod
+    def move(x: int, y: int, field: Field) -> tuple[bool, bool]:
+        """
+        :returned hit: bool, kill: bool
+        Получаем 100 валидные х у.
+        1 - проверяем попали ли. Если да, то hit = True
+        2 - Проверяем во что попали.
+            Если убили kill = True
+        """
+
+        dot = field.board[y][x]
+        if dot.ship:
+            hit = True
+            dot.value = 'X'
+            kill = field.shot(dot.ship)
+        else:
+            dot.value = 'T'
+            hit, kill = False, False
+        return hit, kill
+
+    @staticmethod
+    def select_random_dot(field: Field) -> tuple[int, int]:
+        """ Select random not use dot """
+        while True:
+            x = random.randint(0, 5)
+            y = random.randint(0, 5)
+
+            dot = field.board[y][x]
+            if not dot.value == 'X' or dot.value == 'T':
+                return x, y
+
 
 class User(Player):
     """
     переопределяем аск
     Возможность выбора рандомного выстрела
     """
+    @staticmethod
+    def ask(ai_field: Field) -> tuple[int, int]:
+        """
+        :returned (x, y)
+        1 - Принт того что делаем
+        2 - Инпут + валидация
+        3 - Запись переменных
+        """
+        a = 'Ваш черед ходить! Выберите клетку, в которую нанести удар: '
+        while True:
+            b = input(a)
+
+            if b == '-':
+                return Player.select_random_dot(ai_field)
+            else:
+                b = b.split()
+
+            try:
+                c = len(b)
+                if c == 1: b.append(b[0])  # Если вводим 1 цифру - то она распространяется на 2 координаты
+                if 1 > c or c > 2:
+                    raise GameError('Ошибка ввода! Введите 2 цифры!')
+                try:
+                    x, y = int(b[0]), int(b[1])
+                except ValueError:
+                    raise GameError('Ошибка ввода! Введите цифры!')
+                if not ai_field.out(x, y):
+                    raise GameError('Ошибка ввода! Введите цифры в диапозоне 0-6')
+
+                dot = ai_field.board[y][x]
+                if dot.value == 'X' or dot.value == 'T':
+                    raise GameError('Ошибка ввода! Вы уже стреляли в это место!')
+
+                break
+            except GameError as ge:
+                print(ge)
+        return x, y
 
 
 class PlayerAI(Player):
@@ -277,6 +374,51 @@ class PlayerAI(Player):
 
     Если попали и не убили -
     """
+    # Думаю тут можно было бы как-то использовать проперти и сеттер, но я не понял как
+    def __init__(self, name):
+        super().__init__(name)
+        self.last_hit = None  # Координаты последнего попадания
+        self.first_hit = None  # Координаты первого попадания (для разворота)
+        self.next_shot = None  # Координаты следующего выстрела
+        self.focus_ship = None  # Добиваем корабль
+        self.second_hit = None  # Попали второй раз = определили направление
+        self.direction = None  # Направление атак
+
+    # Возникло много переменных и я решил что записывать их через функцию - нагромождение в коде
+    # def set_last_hit(self, x, y) -> None:
+    #     self.last_hit = [x, y]
+
+    @staticmethod
+    def ask(field: Field) -> tuple[int, int]:
+        """
+        select random
+        :return x: int, y: int
+        """
+        return Player.select_random_dot(field)
+
+    def finish_off(self, field: Field) -> tuple[int, int]:
+        x, y = self.last_hit[0], self.last_hit[1]
+
+        if x + 1 <= 5:
+            dot = field.board[y][x + 1]
+            if dot.value != 'X' or dot.value != 'T':
+                return dot.x, dot.y
+        if y + 1 <= 5:
+            dot = field.board[y + 1][x]
+            if dot.value != 'X' or dot.value != 'T':
+                return dot.x, dot.y
+        if x - 1 >= 0:
+            dot = field.board[y][x - 1]
+            if dot.value != 'X' or dot.value != 'T':
+                return dot.x, dot.y
+        if y - 1 >= 0:
+            dot = field.board[y - 1][x]
+            if dot.value != 'X' or dot.value != 'T':
+                return dot.x, dot.y
+        else:
+            return Player.select_random_dot(field)
+
+
 
 
 class Game:
@@ -288,8 +430,10 @@ class Game:
     def __init__(self, debug: bool = False) -> None:
         self.debug = debug  # При дебаге хочу выводить поле противника себе и мб еще что
         self.last_action = None  # Последнее событие для вывода в интерфейсе
-        self.player_field = Field(hide=True, name='Player')  # Можно сделать ввод своего имени
-        self.ai_field = Field(hide=True, name='AI')
+
+        # Обьявляем игрока и AI
+        self.player = User(name='Player')
+        self.ai = PlayerAI(name='AI')
 
     def start(self) -> None:
         """ Start the game. """
@@ -305,11 +449,10 @@ class Game:
         while True:
             self.step_player()  # Игрок делает ход
             self.print_ui()
-            self.is_win(self.ai_field)  # Проверяем факт победы
 
             self.step_ai()  # Ход ИИ
             self.print_ui()
-            self.is_win(self.player_field)
+
 
     def setup_ship(self) -> None:
         """
@@ -332,10 +475,10 @@ class Game:
             try:
                 c = input()
                 if c == '1':
-                    self.player_field.deploy_ships()
+                    self.player.field.deploy_ships()
                     input_start = False
                 elif c == '2':
-                    self.player_field.auto_deploy_ships()
+                    self.player.field.auto_deploy_ships()
                     input_start = False
                 else:
                     raise GameError('Ошибка 1/2 Введите только 1 или 2')
@@ -343,7 +486,7 @@ class Game:
                 print(ge)
 
         # Авторазмещение поля противника
-        self.ai_field.auto_deploy_ships()
+        self.ai.field.auto_deploy_ships()
 
     def step_player(self) -> None:
         """
@@ -353,7 +496,15 @@ class Game:
         3 - выполнение хода (стрельба -> результат) (должен возвращаться бул + данные)
         4 - повтор в зависимости от результата
         """
+        print('Чтобы выбрать клетку для атаки введите сначала Х (слева-направо) и через пробел У (сверху-вниз)')
+        x, y = self.player.ask(self.ai.field)
+        hit, kill = self.player.move(x, y, self.ai.field)
 
+        if hit:
+            self.is_win(self.ai.field)
+            self.step_player()
+
+    # Переделать под актуальные классы
     @staticmethod  # Если не будем использовать стату
     def is_win(field: Field) -> None:
         """ win or None """
@@ -378,6 +529,25 @@ class Game:
         2 - выполнение хода (должен возвращаться бул + данные)
         3 - при попадании отработка логики (продолжение хода)
         """
+        print('Ход противника...')
+
+        if self.ai.last_hit is None:
+            x, y = self.ai.ask(self.player.field)
+        else:
+            x, y = self.ai.finish_off(self.player.field)
+
+        hit, kill = self.ai.move(x, y, self.player.field)
+
+        if hit:
+            print('Противник попал.')
+            self.is_win(self.player.field)
+
+            if not kill:
+                self.ai.last_hit = [x, y]
+            else:
+                self.ai.last_hit = None
+
+            self.step_ai()
 
     # ================================================
     #                   Interface
@@ -393,16 +563,17 @@ class Game:
 
     def print_fields(self) -> None:
         if self.debug:
-            for y in self.player_field.board:
+            for y in self.player.field.board:
                 print([f'x={dot.x}|y={dot.y}|value={dot.value}|free={dot.free}' for dot in y])
             print('')
-            for y in self.ai_field.board:
+            for y in self.ai.field.board:
                 print([f'x={dot.x}|y={dot.y}|value={dot.value}|free={dot.free}' for dot in y])
         else:
-            for y in self.player_field.board:
+            print('Ваше поле')
+            for y in self.player.field.board:
                 print([f'{dot.value}' for dot in y])
-            print('')
-            for y in self.ai_field.board:
+            print('Поле противника')
+            for y in self.ai.field.board:
                 print([f'{dot.value}' for dot in y])
         # выводим поле врага форматируя символы
 
@@ -413,8 +584,5 @@ class Game:
         2. Выводим ласт экшн
         3. Выводим доски
         """
-        #
+        # self.print_message(self.last_action)
         self.print_fields()
-
-
-

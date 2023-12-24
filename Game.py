@@ -1,13 +1,5 @@
-"""
-В данном файле описана основная логика игры
-"""
 import random
-from game_errors import er01, er02, er03, er04
-
-
-def welcome_message():
-    """ Print welcome message at startup """
-    print('How to play Sea Battle... (soon)')
+import sys
 
 
 class GameError(Exception):
@@ -17,45 +9,41 @@ class GameError(Exception):
 
 
 class Dot:
+    """ Dot data """
     def __init__(self, x: int, y: int, value='О'):
         self.x, self.y = x, y
         self.value = value
         self.free = True  # Used to install ships
         self.ship = None
 
+    def __str__(self):
+        return self.value
+
     def set_ship(self, ship) -> None:
         """ Set ship to dot """
         self.ship = ship
 
-    # Использует маг методы сравнения
-    # __eq__() – для равенства ==
-    # __ne__() – для неравенства !=
-    # Где вызывает определеные ошибки, которые будут отрабатываться
+    # Я не использую маг методы сравнения, т.к. не сравниваю доты между собой
 
 
 class Ship:
     """ Ship data """
-
     def __init__(self, size: int, pivot_dot: Dot, rotate: int = 0):
         self.size = size
         self.pivot_dot = pivot_dot
-        # self.x, self.y = x, y  # pivot point
         self.rotate = rotate
         self.hp = size
 
 
 class Field:
     def __init__(self, hide: bool, name: str) -> None:
-        # Размер игрового поля
+        # Размер игрового поля и его инициализация
         self.x = self.y = 6
-        # Его инициализация
-        self.board = [[Dot(i, j) for i in range(self.x)] for j in range(self.y)]
-        # board[y][x]!!!!
+        self.board = [[Dot(i, j) for i in range(self.x)] for j in range(self.y)]  # вызов дота - board[y][x]!!!!
 
         self.name = name  # Кому принадлежит поле
-        self.hide = hide  # Отображение поля (не используется :С )
+        self.hide = hide  # Отображение поля
         self.active_ships = 0  # Кол-во активных кораблей
-        self.ships = []  # Обьекты принадлежащих кораблей / Наполняется, но не используется
 
         # Плохое место хранения, но удобнее пока нет
         # list:[list[name: str, size: int]]
@@ -64,7 +52,7 @@ class Field:
 
     def out(self, x: int, y: int) -> bool:
         """
-        Проверяет, выходит ли точка за пределы поля
+        Checks if a point is outside the field
         """
         if x in range(0, self.x) and y in range(0, self.y):
             return True
@@ -84,7 +72,7 @@ class Field:
             for i in range(ship.size - 1):
                 x += 1
                 if x > 5:  # Можно было сделать через self.out, но выходит больше действий
-                    er02()
+                    print('Ошибка! Корабль выходит за границы поля!')
                     return False
                 dots_list.append(self.board[y][x])
 
@@ -92,7 +80,7 @@ class Field:
             for i in range(ship.size - 1):
                 y += 1
                 if y > 5:
-                    er02()
+                    print('Ошибка! Корабль выходит за границы поля!')
                     return False
                 dots_list.append(self.board[y][x])
 
@@ -100,7 +88,7 @@ class Field:
             for i in range(ship.size - 1):
                 x -= 1
                 if x < 0:
-                    er02()
+                    print('Ошибка! Корабль выходит за границы поля!')
                     return False
                 dots_list.append(self.board[y][x])
 
@@ -108,11 +96,9 @@ class Field:
             for i in range(ship.size - 1):
                 y -= 1
                 if y < 0:
-                    er02()
+                    print('Ошибка! Корабль выходит за границы поля!')
                     return False
                 dots_list.append(self.board[y][x])
-        else:
-            raise GameError(f'Что-то пошло не так... get_ship_dots -> ship.rotate?? {ship.rotate} ')
         return dots_list
 
     def contour(self, dot: Dot) -> None:
@@ -127,103 +113,98 @@ class Field:
         if dot.y - 1 >= 0:
             self.board[dot.y - 1][dot.x].free = False
 
-    def add_ship(self, ship: Ship):
-        """ Перед вызовом проверить возможности размещения и создать обозначить класс """
-
-        # Размещение
+    def add_ship(self, ship: Ship) -> None:
+        """ Placing a ship on the field. Changes the status of the Dot and gives the ships an outline. """
         dots_list = self.get_ship_dots(ship)
         for dot in dots_list:
             dot.value = '■'
             dot.set_ship(ship)
             self.contour(dot)
-
-        # Добавление активного судна
         self.active_ships += 1
-        self.ships.append(ship)
-
-        print('Корабль успешно размещен')
+        print('Корабль успешно размещен.')
 
     def may_add_ship(self, ship: Ship) -> bool:
         """ Check free Dot for ship """
         if not ship.pivot_dot.free:  # Дот заблокирован
-            er01(ship.pivot_dot)
+            print(f'Ошибка! Эта ячейка занята x:{ship.pivot_dot.x}, y:{ship.pivot_dot.y}! ')
             return False
         if ship.size > 1:  # Корабль занимает больше 1 дота
             dots_list = self.get_ship_dots(ship)  # Получаем список всех дотов корабля
-            if dots_list == False:
+            if not dots_list:
                 return False
             for dot in dots_list:
                 if not dot.free:
-                    er03(dot)
+                    print(f'Ошибка размещения! Часть корабля заходит на занятую ячейку!'
+                          f'x:{dot.x}, y:{dot.y}')
                     return False
         return True
 
-    # Функции деплой и автодеплой шипс можно обьеденить повторяющийся код
-    def deploy_ships(self):
-        """ Ручная реализация кораблей на поле """
+    def deploy(self, current_ship: list, input_x: int, input_y: int, input_rotate: int) -> tuple[bool, Ship]:
+        """ Reducing duplicate code
+        При подтверждении возможности размещения судна возвращает bool для цикла и Ship
         """
-        Создаем шип и даем ему пивот и ротейт, потом юзаем этот шип
-        
-        Надо иметь список размещаемых кораблей и начинать с больших
-        выводим инструкцию (print_help_deploy)
-        Cпрашиваем куда пивот поинт и какую ротацию
-        Как и адд_шип, надо определять свободность клеток и наличие их на поле (may add ship)
-        Если всё ок - выполняем адд шип, затем работаем со следующим
-        Если корабли кончились - заканчиваем
-        """
+        no_valid_ship = True
+        ship_pivot_dot = self.board[input_y][input_x]  # Вызываем Dot этих координат
+        # Обьявляем судно с полученными данными
+        if current_ship[1] != 1:  # Если корабль длиннее чем 1
+            new_ship = Ship(current_ship[1], ship_pivot_dot, input_rotate)
+        else:
+            new_ship = Ship(current_ship[1], ship_pivot_dot)
+        if self.may_add_ship(new_ship):  # Можем ли расположить всё судно?
+            no_valid_ship = False
+        return no_valid_ship, new_ship
 
+    def deploy_ships(self):
+        """ Manual implementation of ships on the field """
         for current_ship in self.ship_list:
             input_x, input_y, input_rotate, new_ship = None, None, None, None
 
+            # Вывод подсказки для ввода
+            print(f'Нужно указать координаты начальной точки корабля: {current_ship[0]}\n'
+                  f'Введите через пробел сначала координату Х, потом координату У.')
+            print(f'Потом поворот судна (в какую сторону будет распологаться его остальная часть от начала)\n'
+                  f'1 - это направо, 2 - вниз, 3 - влево, 4 - вверх')
+
+            # Вывод поля для навигации
             for y in self.board:
-                print([f'x={dot.x}|y={dot.y}|value={dot.value}|free={dot.free}' for dot in y])
+                print([f'{dot.value}' for dot in y])
 
             # Цикл валидации судна целиком
             no_valid_ship = True
             while no_valid_ship:
 
-                # Вывод подсказки для ввода
-                print(f'Нужно указать координаты начальной точки корабля: {current_ship[0]}\n'
-                      f'Введите через пробел сначала координату Х, потом координату У')
-                if current_ship != '4':  # Если корабль длинее чем 1, инфа по повороту
-                    print(f'Потом поворот судна (в какую сторону будет распологаться его остальная часть от начала)'
-                          f'1 - это направо, 2 - вниз, 3 - влево, 4 - вверх')
-
                 # Цикл валидации инпута
                 no_valid_input = True
                 while no_valid_input:
-                    info = input().split()
-                    input_x = int(info[0])
-                    input_y = int(info[1])
-                    input_rotate = int(info[2])
-                    print(f'x = {input_x} y = {input_y} rotate = {input_rotate}')
-                    if self.out(input_x, input_y):  # Если ячейка в пределах доски
-                        if self.board[input_y][input_x].free:  # Если ячейка свободна
-                            if 1 <= input_rotate <= 4:
-                                no_valid_input = False
+                    try:
+                        info = input('Ваш ввод (х, у, rotate):').split()
+                        if len(info) != 3:
+                            raise GameError('Ошибка ввода! Введите 3 числа через пробел!')
+                        try:
+                            input_x = int(info[0])
+                            input_y = int(info[1])
+                            input_rotate = int(info[2])
+                            print(f'x = {input_x} y = {input_y} rotate = {input_rotate}')
+                        except ValueError:
+                            raise GameError('Ошибка ввода! Введите целые числа!')
+                        if self.out(input_x, input_y):  # Если ячейка в пределах доски
+                            if self.board[input_y][input_x].free:  # Если ячейка свободна
+                                if 1 <= input_rotate <= 4:
+                                    no_valid_input = False
+                                else:
+                                    raise GameError('Ошибка! Поворот от 1 до 4!')
                             else:
-                                print('Поворот 1-4!')
+                                raise GameError(f'Ошибка! Ячейка x:{input_x} y:{input_y} занята!')
                         else:
-                            print(f'Ячейка x:{input_x} y:{input_y} занята')
-                    else:
-                        game_errors.er04()
+                            raise GameError(f'Ошибка! Ячейка х:{input_x} y:{input_y} находиться вне поля!')
+                    except GameError as ge:
+                        print(ge)
 
-                ship_pivot_dot = self.board[input_y][input_x]  # Вызываем Dot этих координат
-
-                # Обьявляем судно с полученными данными
-                if current_ship[1] != 1:  # Если корабль длиннее чем 1
-                    new_ship = Ship(current_ship[1], ship_pivot_dot, input_rotate)
-                else:
-                    new_ship = Ship(current_ship[1], ship_pivot_dot)
-
-                # Можем ли расположить всё судно?
-                if self.may_add_ship(new_ship):  # Функция обрабатывает все ошибки
-                    no_valid_ship = False
+                no_valid_ship, new_ship = self.deploy(current_ship, input_x, input_y, input_rotate)
             self.add_ship(new_ship)
 
-    # Функции деплой и автодеплой шипс можно обьеденить повторяющийся код
     def auto_deploy_ships(self):
-        """ automatic deploy ship """
+        """ Automatic placement of ships """
         for current_ship in self.ship_list:
             input_x, input_y, input_rotate, new_ship = None, None, None, None
             # Цикл валидации судна целиком
@@ -233,35 +214,20 @@ class Field:
                 # Цикл валидации инпута
                 no_valid_input = True
                 while no_valid_input:
-                    # info = input().split()
-
                     input_x = random.randint(0, 5)
                     input_y = random.randint(0, 5)
                     input_rotate = random.randint(1, 4)
                     if self.board[input_y][input_x].free:  # Если ячейка свободна идём дальше
                         no_valid_input = False
-
-                ship_pivot_dot = self.board[input_y][input_x]  # Вызываем Dot этих координат
-
-                # Обьявляем судно с полученными данными
-                if current_ship[1] != 1:  # Если корабль длиннее чем 1
-                    new_ship = Ship(current_ship[1], ship_pivot_dot, input_rotate)
-                else:
-                    new_ship = Ship(current_ship[1], ship_pivot_dot)
-
-                # Можем ли расположить всё судно?
-                if self.may_add_ship(new_ship):  # Функция обрабатывает все ошибки
-                    no_valid_ship = False
-
+                no_valid_ship, new_ship = self.deploy(current_ship, input_x, input_y, input_rotate)
             self.add_ship(new_ship)
 
     def shot(self, ship: Ship) -> bool:
         """
-        Отнимает жизь кораблю, если их теперь 0, то убирает его из списка и возвращает бул
+        Takes the life of a ship, if there are now 0 of them, then removes it from the list and returns bool
         """
         if ship.hp == 1:
             ship.hp = 0
-            # self.ship_list.remove(ship)  # Будет тут ошибка?
             self.active_ships -= 1
             kill = True
         else:
@@ -272,17 +238,9 @@ class Field:
 
 class Player:
     """
-    Будущий родитель игрока и ИИ
-
-    Имеет своё поле
-    имеет доску противника
-
-    ask - where to shoot (переопределяется в дочерках)
-    move - стреляем и отрабатываем ошибки
-
-    функция рандомного выбора дота в который не стреляли
+    Parent class for all players.
+    Have name and field.
     """
-
     def __init__(self, name):
         self.name = name
         self.field = Field(hide=True, name=self.name)
@@ -295,12 +253,8 @@ class Player:
     def move(x: int, y: int, field: Field) -> tuple[bool, bool]:
         """
         :returned hit: bool, kill: bool
-        Получаем 100 валидные х у.
-        1 - проверяем попали ли. Если да, то hit = True
-        2 - Проверяем во что попали.
-            Если убили kill = True
+        We check whether the ship was hit and confirm its destruction.
         """
-
         dot = field.board[y][x]
         if dot.ship:
             hit = True
@@ -317,37 +271,35 @@ class Player:
         while True:
             x = random.randint(0, 5)
             y = random.randint(0, 5)
-
             dot = field.board[y][x]
-            if not dot.value == 'X' or dot.value == 'T':
+            if dot.value != 'X' and dot.value != 'T':
                 return x, y
 
 
 class User(Player):
     """
-    переопределяем аск
-    Возможность выбора рандомного выстрела
+    Player class
     """
     @staticmethod
     def ask(ai_field: Field) -> tuple[int, int]:
         """
         :returned (x, y)
-        1 - Принт того что делаем
-        2 - Инпут + валидация
-        3 - Запись переменных
+        input validation
         """
-        a = 'Ваш черед ходить! Выберите клетку, в которую нанести удар: '
+        a = ('Ваша очередь ходить! Выберите клетку, в которую нанести удар!\n'
+             'Вводите координаты Х и У, можно ввести 1 цифру для Х=У\n'
+             'Или ввести "-" для выбора случайной клетки: ')
         while True:
             b = input(a)
-
-            if b == '-':
+            if b == '-':  # Выбор случайной клетки
                 return Player.select_random_dot(ai_field)
             else:
                 b = b.split()
 
             try:
                 c = len(b)
-                if c == 1: b.append(b[0])  # Если вводим 1 цифру - то она распространяется на 2 координаты
+                if c == 1:
+                    b.append(b[0])  # Если вводим 1 цифру - то она распространяется на 2 координаты
                 if 1 > c or c > 2:
                     raise GameError('Ошибка ввода! Введите 2 цифры!')
                 try:
@@ -356,11 +308,9 @@ class User(Player):
                     raise GameError('Ошибка ввода! Введите цифры!')
                 if not ai_field.out(x, y):
                     raise GameError('Ошибка ввода! Введите цифры в диапозоне 0-6')
-
                 dot = ai_field.board[y][x]
                 if dot.value == 'X' or dot.value == 'T':
                     raise GameError('Ошибка ввода! Вы уже стреляли в это место!')
-
                 break
             except GameError as ge:
                 print(ge)
@@ -369,10 +319,7 @@ class User(Player):
 
 class PlayerAI(Player):
     """
-    Переопределяем аск
-    рандом по полю
-
-    Если попали и не убили -
+    Implementation of artificial intelligence
     """
     # Думаю тут можно было бы как-то использовать проперти и сеттер, но я не понял как
     def __init__(self, name):
@@ -383,10 +330,7 @@ class PlayerAI(Player):
         self.focus_ship = None  # Добиваем корабль
         self.second_hit = None  # Попали второй раз = определили направление
         self.direction = None  # Направление атак
-
-    # Возникло много переменных и я решил что записывать их через функцию - нагромождение в коде
-    # def set_last_hit(self, x, y) -> None:
-    #     self.last_hit = [x, y]
+    # Возникло много переменных и я решил что записывать их через функции set_name - нагромождение в коде
 
     @staticmethod
     def ask(field: Field) -> tuple[int, int]:
@@ -396,51 +340,83 @@ class PlayerAI(Player):
         """
         return Player.select_random_dot(field)
 
-    def finish_off(self, field: Field) -> tuple[int, int]:
+    def search_next_shot(self, field: Field) -> tuple[int, int]:
+        """
+        Ищет ближайшую точку к прошлому попаданию и записывает направление
+        """
         x, y = self.last_hit[0], self.last_hit[1]
 
-        if x + 1 <= 5:
+        if x + 1 <= self.field.x - 1:
             dot = field.board[y][x + 1]
-            if dot.value != 'X' or dot.value != 'T':
+            if dot.value != 'X' and dot.value != 'T':
+                self.direction = 1
                 return dot.x, dot.y
-        if y + 1 <= 5:
+        if y + 1 <= self.field.y - 1:
             dot = field.board[y + 1][x]
-            if dot.value != 'X' or dot.value != 'T':
+            if dot.value != 'X' and dot.value != 'T':
+                self.direction = 2
                 return dot.x, dot.y
         if x - 1 >= 0:
             dot = field.board[y][x - 1]
-            if dot.value != 'X' or dot.value != 'T':
+            if dot.value != 'X' and dot.value != 'T':
+                self.direction = 3
                 return dot.x, dot.y
         if y - 1 >= 0:
             dot = field.board[y - 1][x]
-            if dot.value != 'X' or dot.value != 'T':
+            if dot.value != 'X' and dot.value != 'T':
+                self.direction = 4
                 return dot.x, dot.y
         else:
             return Player.select_random_dot(field)
 
+    def set_next_shot(self, field: Field) -> None:
+        """
+        Записывает следующий выстрел по направлению прошлого попадания.
+        Инвертированная версия будет считаться от первого попадания.
 
+        Возможно избавлюсь от этой функции
+        """
+        x, y = self.last_hit[0], self.last_hit[1]
+
+        if self.direction == 1:
+            if 0 <= x + 1 <= self.field.x - 1:
+                dot = field.board[y][x + 1]
+                if dot.value != 'X' and dot.value != 'T':
+                    self.next_shot = dot.x, dot.y
+        if self.direction == 2:
+            if 0 <= y + 1 <= self.field.y - 1:
+                dot = field.board[y + 1][x]
+                if dot.value != 'X' and dot.value != 'T':
+                    self.next_shot = dot.x, dot.y
+        if self.direction == 3:
+            if 0 <= x - 1 <= self.field.x - 1:
+                dot = field.board[y][x - 1]
+                if dot.value != 'X' and dot.value != 'T':
+                    self.next_shot = dot.x, dot.y
+        if self.direction == 4:
+            if 0 <= y - 1 <= self.field.y - 1:
+                dot = field.board[y - 1][x]
+                if dot.value != 'X' and dot.value != 'T':
+                    self.next_shot = dot.x, dot.y
+
+        else:  # Если что-то не так - рандом выстрел
+            self.next_shot = Player.select_random_dot(field)
 
 
 class Game:
     """
     Main game class.
-    Здесь высокоуровневая логика ссылающаяся на низкоуровневую (и интерфейс)
     """
-
     def __init__(self, debug: bool = False) -> None:
-        self.debug = debug  # При дебаге хочу выводить поле противника себе и мб еще что
-        self.last_action = None  # Последнее событие для вывода в интерфейсе
-
-        # Обьявляем игрока и AI
+        self.debug = debug  # При дебаге выводиться поле врага и больше информации
         self.player = User(name='Player')
         self.ai = PlayerAI(name='AI')
 
     def start(self) -> None:
         """ Start the game. """
         a = f'Welcome to Sea Battle'
+        # Обьясняем правила игры
         print(a)
-        # Определяем какие найстройки мне нужны
-        # Напимер ии или что-то еще, пока просто привет
 
         self.setup_ship()  # Расставляем корабли
         self.print_ui()  # выводим весь интерфейс
@@ -453,18 +429,15 @@ class Game:
             self.step_ai()  # Ход ИИ
             self.print_ui()
 
-
     def setup_ship(self) -> None:
         """
-        Вывод описания
-        Вопрос автодеплоя
-            автодеплой
-            Ручная реализация
-        Автодеплой ии
+        Print description ->
+        user deploy/autodeploy ->
+        ai autodeploy.
         """
 
         query = (f'Вы можете расставить корабли на поле самостоятельно\n'
-                 f'Или воспользоваться случайной растановкой.\n'
+                 f'Или воспользоваться случайной расстановкой.\n'
                  f'Введите:\n'
                  f'1 - для ручной установки.\n'
                  f'2 - для автоматической установки')
@@ -485,83 +458,94 @@ class Game:
             except GameError as ge:
                 print(ge)
 
-        # Авторазмещение поля противника
         self.ai.field.auto_deploy_ships()
 
     def step_player(self) -> None:
         """
-        Обращаемся к классу игрока
-        1 - инпут хода игрока + описание что делать
-        2 - валидация хода
-        3 - выполнение хода (стрельба -> результат) (должен возвращаться бул + данные)
-        4 - повтор в зависимости от результата
+        User input validation
+        Execution of a move and its consequences.
+        Recursion on hit.
         """
-        print('Чтобы выбрать клетку для атаки введите сначала Х (слева-направо) и через пробел У (сверху-вниз)')
-        x, y = self.player.ask(self.ai.field)
-        hit, kill = self.player.move(x, y, self.ai.field)
+        x, y = self.player.ask(self.ai.field)  # Получаем координаты хода
+        hit, kill = self.player.move(x, y, self.ai.field)  # Получаем результат хода
 
         if hit:
+            print(f'Вы попали! X{x}:Y{y}')
+            if kill:
+                print(f'***************************')
+                print(f'Вы потопили корабль врага!!')
             self.is_win(self.ai.field)
             self.step_player()
+        else:
+            print('Вы промазали!')
 
     # Переделать под актуальные классы
-    @staticmethod  # Если не будем использовать стату
-    def is_win(field: Field) -> None:
+    # @staticmethod  # Если не будем использовать стату
+    def is_win(self, field: Field) -> None:
         """ win or None """
         # Получаем поле проигравшего
         if field.active_ships == 0:
             if field.name == 'AI':
                 print('Ура победа! Вы одолели эту консервную банку! Вы молодец!')
+                print(f'При этом у вас осталось {self.player.field.active_ships} кораблей!')
             else:
                 print('О нет! Технологии вас одолели! :С')
-        """
-        Получаем боард, проверяем кол-во активных кораблей на доске
-        Если 0 - то обьявляем победу 
-        
-        Отдельная тут логика - победа.
-        Пишем кто выйграл и предлагаем начать новую игру или закрыть игру.
-        """
+                print(f'При этом у противника осталось {self.ai.field.active_ships} кораблей!')
+            a = 'Благодарю вас за игру! Чтобы начать новую игру - перезапустите приложение.'
+            print(a)
+            sys.exit()
 
     def step_ai(self) -> None:
         """
-        Обращаемся к классу ИИ
-        1 - Запуск рандома и его валидация
-        2 - выполнение хода (должен возвращаться бул + данные)
-        3 - при попадании отработка логики (продолжение хода)
+        *Using hit memory*
+        Execution of a move and its consequences.
+        Recursion on hit.
         """
-        print('Ход противника...')
+        if self.ai.focus_ship is None:  # Нет фокуса на корабле
+            if self.debug:
+                print('Враг не в фокусе')
+            x, y = self.ai.ask(self.player.field)  # random step
+            self.ai.first_hit = None
+            self.ai.next_shot = None
 
-        if self.ai.last_hit is None:
-            x, y = self.ai.ask(self.player.field)
-        else:
-            x, y = self.ai.finish_off(self.player.field)
+        elif self.ai.next_shot is not None:  # Есть точное знание куда ходить
+            if self.debug:
+                print('Враг знает куда стрелять!')
+            x, y = self.ai.next_shot
+            self.ai.next_shot = None
 
+        else:  # Было 1 попадание
+            if self.debug:
+                print('Враг помнит про попадание')
+            x, y = self.ai.search_next_shot(self.player.field)
+
+        print(f'Противник ходит X{x}:Y{y}')
         hit, kill = self.ai.move(x, y, self.player.field)
-
+        #
         if hit:
-            print('Противник попал.')
-            self.is_win(self.player.field)
-
+            print(f'Противник попал! X{x}:Y{y}')
+            self.is_win(self.player.field)  # Проверяем победу ии
             if not kill:
+                self.ai.focus_ship = True
                 self.ai.last_hit = [x, y]
+                if self.ai.first_hit:  # Если это не первое попадание
+                    self.ai.set_next_shot(self.player.field)  # Устанавливает следующий ход по направлению
             else:
-                self.ai.last_hit = None
+                print(f'******************************')
+                print(f'Противник потопил наш корабль!')
+                self.ai.focus_ship = None  # Снимаем слежку за судном
 
             self.step_ai()
+        else:
+            print('Противник промазал!')
 
     # ================================================
     #                   Interface
     # ================================================
 
-    def print_message(self, last_action: str) -> None:
-        """ print last message """
-        if last_action is not None:
-            query = (f'****************************'
-                     f'{last_action}'
-                     f'****************************')
-            print(query)
+    # Нужна функция вывода поля при ручном деплои карабликов line 166
 
-    def print_fields(self) -> None:
+    def print_ui(self) -> None:
         if self.debug:
             for y in self.player.field.board:
                 print([f'x={dot.x}|y={dot.y}|value={dot.value}|free={dot.free}' for dot in y])
@@ -574,15 +558,6 @@ class Game:
                 print([f'{dot.value}' for dot in y])
             print('Поле противника')
             for y in self.ai.field.board:
-                print([f'{dot.value}' for dot in y])
-        # выводим поле врага форматируя символы
+                # print([f'{dot.value}' for dot in y])
+                print(['O' if dot.value == '■' else f'{dot.value}' for dot in y])
 
-    def print_ui(self) -> None:
-        """
-        Выводим клевый интерфейс:
-        1. Производим очистку интерфейса (если без дебага)
-        2. Выводим ласт экшн
-        3. Выводим доски
-        """
-        # self.print_message(self.last_action)
-        self.print_fields()

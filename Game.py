@@ -36,13 +36,11 @@ class Ship:
 
 
 class Field:
-    def __init__(self, hide: bool, name: str) -> None:
+    def __init__(self, name: str) -> None:
         # Размер игрового поля и его инициализация
         self.x = self.y = 6
         self.board = [[Dot(i, j) for i in range(self.x)] for j in range(self.y)]  # вызов дота - board[y][x]!!!!
-
         self.name = name  # Кому принадлежит поле
-        self.hide = hide  # Отображение поля
         self.active_ships = 0  # Кол-во активных кораблей
 
         # Плохое место хранения, но удобнее пока нет
@@ -210,7 +208,7 @@ class Field:
                             else:
                                 raise GameError(f'Ошибка! Ячейка x:{input_x + 1} y:{input_y + 1} занята!')
                         else:
-                            raise GameError(f'Ошибка! Ячейка х:{input_x + 1} y:{input_y + 1} находиться вне поля!')
+                            raise GameError(f'Ошибка! Ячейка х:{input_x + 1} y:{input_y + 1} находится вне поля!')
                     except GameError as ge:
                         print(ge)
 
@@ -257,7 +255,7 @@ class Player:
     """
     def __init__(self, name):
         self.name = name
-        self.field = Field(hide=True, name=self.name)
+        self.field = Field(name=self.name)
 
     @staticmethod
     def ask(field: Field) -> tuple[int, int]:
@@ -386,7 +384,7 @@ class Game:
     @staticmethod
     def print_welcome():
         print('*********************************************************************\n'
-              '            Добро пожаловать игру "Морской бой"!!\n'
+              '            Добро пожаловать в игру "Морской бой"!!\n'
               '*********************************************************************')
         print('     Правила игры:')
         print('1. Игровое поле представляет собой сетку двух координат, обозначенную цифрами (1-6) по Х и У.\n'
@@ -538,8 +536,10 @@ class Game:
         print(f'4 | {pb[3][0]} | {pb[3][1]} | {pb[3][2]} | {pb[3][3]} | {pb[3][4]} | {pb[3][5]} |'
               f'         4 | {aib[3][0]} | {aib[3][1]} | {aib[3][2]} | {aib[3][3]} | {aib[3][4]} | {aib[3][5]} |')
         print(f'5 | {pb[4][0]} | {pb[4][1]} | {pb[4][2]} | {pb[4][3]} | {pb[4][4]} | {pb[4][5]} |'
-              f'         5 | {aib[4][0]} | {aib[4][1]} | {aib[4][2]} | {aib[4][3]} | {aib[4][4]} | {aib[4][5]} |')
+              f'         5 | {aib[4][0]} | {aib[4][1]} | {aib[4][2]} | {aib[4][3]} | {aib[4][4]} | {aib[4][5]} |'
+              f'    X - Попадание')
         print(f'6 | {pb[5][0]} | {pb[5][1]} | {pb[5][2]} | {pb[5][3]} | {pb[5][4]} | {pb[5][5]} |'
-              f'         6 | {aib[5][0]} | {aib[5][1]} | {aib[5][2]} | {aib[5][3]} | {aib[5][4]} | {aib[5][5]} |')
+              f'         6 | {aib[5][0]} | {aib[5][1]} | {aib[5][2]} | {aib[5][3]} | {aib[5][4]} | {aib[5][5]} |'
+              f'    Т - Промах')
         print('Y                                   Y')
         print('==============================================================')
